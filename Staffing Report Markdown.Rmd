@@ -1,0 +1,516 @@
+---
+output:
+  pdf_document:
+    latex_engine: xelatex
+mainfont: Georgia
+params:
+  district_name: NULL
+  state_name: NULL
+header-includes:
+  - \usepackage{graphicx}
+  - \usepackage{titlesec}
+  - \usepackage{pdflscape}
+  - \usepackage{longtable}
+  - \usepackage{booktabs}
+  - \usepackage{fancyhdr}
+  - \titleformat{\section}{\centering\LARGE\bfseries}{\thesection}{1em}{}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10.5,
+fig.height = 7.5,
+dpi = 300
+)
+
+district_name <- params$district_name
+state_name <- params$state_name
+
+source(
+  "Staffing Report Generator.R",
+  local = TRUE
+)
+```
+
+```{r narrative_text, include=FALSE}
+build_narratives <- function(sizex) {
+
+  comparison_data <- chart.data.calc.fn(
+    select.district.state.data.function(
+      yearx = set.year,
+      districtx = select.district,
+      statex = select.state,
+      sizex = sizex
+    )
+  )
+
+  list(
+    chart1 = chart_1_narrative_fn(
+      comparison_data,
+      select.district),
+    chart2 = chart_2_narrative_fn(
+      comparison_data,
+      select.district),
+    chart3 = chart_3_narrative_fn(
+      comparison_data,
+      select.district),
+    chart4 = chart_4_narrative_fn(
+      comparison_data,
+      select.district),
+    chart5 = chart_5_narrative_fn(
+      comparison_data,
+      select.district),
+    chart6 = chart_6_narrative_fn(
+      comparison_data,
+      select.district)
+  )
+}
+
+narrative_15k  <- build_narratives(15000)
+narrative_50k  <- build_narratives(50000)
+narrative_100k <- build_narratives(100000)
+```
+
+```{r CGCS_narrative_text, include=FALSE}
+build_cgcs_narratives <- function() {
+
+  comparison_data <- chart.data.calc.fn(
+    select.cgcs.state.data.function(
+      yearx = set.year,
+      districtx = select.district,
+      statex = select.state
+    )
+  )
+
+  list(
+    chart1 = chart_1_narrative_fn(comparison_data, select.district),
+    chart2 = chart_2_narrative_fn(comparison_data, select.district),
+    chart3 = chart_3_narrative_fn(comparison_data, select.district),
+    chart4 = chart_4_narrative_fn(comparison_data, select.district),
+    chart5 = chart_5_narrative_fn(comparison_data, select.district),
+    chart6 = chart_6_narrative_fn(comparison_data, select.district)
+  )
+}
+
+narrative_cgcs <- build_cgcs_narratives()
+```
+
+
+\vspace*{\fill}
+
+\begin{center}
+
+\includegraphics[width=6cm]{CGCS_logo.png}
+
+\vspace{0.5cm}
+
+{\Huge \textbf{Staffing Report}}
+
+\vspace{0.5cm}
+
+{\small \textbf{For}}
+
+\vspace{0.5cm}
+
+{\LARGE `r params$district_name`}
+
+\vspace{0.5cm}
+
+{\large `r params$state_name`}
+
+\vspace{0.5cm}
+
+{\small \textbf{by}}
+
+\vspace{0.5cm}
+
+{\Large The Council of the Great City Schools}
+
+\vspace{0.5cm}
+
+{\small \textbf{On}}
+
+\vspace{0.5cm}
+
+{\large `r format(Sys.Date(), "%B %d, %Y")`}
+
+\end{center}
+
+\vspace*{\fill}
+
+\thispagestyle{empty} 
+
+\newpage 
+
+\pagestyle{fancy} 
+\fancyhf{} 
+
+\fancyfoot[C]{\scriptsize The Council of the Great City Schools Staffing Report `r format(Sys.Date(), "%Y")` 
+\hspace{1em} | \hspace{1em} \thepage} 
+
+\renewcommand{\headrulewidth}{0pt} 
+\renewcommand{\footrulewidth}{0.2pt}
+
+\pagenumbering{roman} 
+
+\tableofcontents 
+
+\thispagestyle{plain} 
+
+\newpage 
+
+\pagenumbering{arabic} 
+
+\setcounter{page}{1} 
+
+# Introduction
+
+This report summarizes staffing information for **`r params$district_name`** in **`r params$state_name`**.
+
+\newpage 
+
+\vspace*{\fill} 
+
+\addcontentsline{toc}{section}{Workforce Composition of School Districts with 15,000 or More Students}
+
+\begin{center} {\LARGE\bfseries Workforce Composition of School Districts with 15,000 or More Students} 
+\end{center} \vspace*{\fill} 
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 1: Student to Total District Staff Ratio}
+**Figure 1.**
+
+```{r fig1}
+print(fig.1)
+```
+
+`r narrative_15k$chart1`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 2: Teachers as a Percentage of Total Staff}
+**Figure 2.**
+
+```{r fig2}
+
+print(fig.2)
+```
+
+`r narrative_15k$chart2`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 3: Students per Teacher Ratio}
+**Figure 3.**
+
+```{r fig3}
+
+print(fig.3)
+```
+
+`r narrative_15k$chart3`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 4: Students per Total Central Office Administrative and Support Staff}
+**Figure 4.**
+
+```{r fig4}
+print(fig.4)
+```
+
+`r narrative_15k$chart4`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 5: Students per Total School Site Administrative and Support Staff}
+**Figure 5.**
+
+```{r fig5}
+print(fig.5)
+```
+
+`r narrative_15k$chart5`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 6: Students per Combined School and Central Office Administrative and Support Staff }
+**Figure 6.**
+
+```{r fig6}
+print(fig.6)
+```
+
+`r narrative_15k$chart6`
+
+\newpage 
+\thispagestyle{empty} 
+
+\vspace*{\fill} 
+
+\addcontentsline{toc}{section}{Workforce Composition of School Districts with 50,000 or More Students}
+
+\begin{center} 
+{\LARGE\bfseries Workforce Composition of School Districts with 50,000 or More Students} 
+\end{center} 
+
+\vspace*{\fill} 
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 7: Student to Total District Staff Ratio}
+**Figure 7.**
+
+```{r fig7}
+print(fig.7)
+```
+
+`r narrative_50k$chart1`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 8: Teachers as a Percentage of Total Staff}
+**Figure 8.**
+
+```{r fig8}
+
+print(fig.8)
+```
+
+`r narrative_50k$chart2`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 9: Students per Teacher Ratio}
+**Figure 9.**
+
+```{r fig9}
+
+print(fig.9)
+```
+
+`r narrative_50k$chart3`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 10: Students per Total Central Office Administrative and Support Staff}
+**Figure 10.**
+
+```{r fig10}
+print(fig.10)
+```
+
+`r narrative_50k$chart4`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 11: Students per Total School Site Administrative and Support Staff}
+**Figure 11.**
+
+```{r fig11}
+print(fig.11)
+```
+
+`r narrative_50k$chart5`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 12: Students per Combined School and Central Office Administrative and Support Staff }
+**Figure 12.**
+
+```{r fig12}
+print(fig.12)
+```
+
+`r narrative_50k$chart6`
+
+\newpage
+
+# Workforce Composition of School Districts with 100,000 or More Students
+
+\newpage
+
+
+\addcontentsline{toc}{subsection}{Figure 13: Student to Total District Staff Ratio}
+**Figure 13.**
+
+```{r fig13}
+print(fig.13)
+```
+
+`r narrative_100k$chart1`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 14: Teachers as a Percentage of Total Staff}
+**Figure 14.**
+
+```{r fig14}
+
+print(fig.14)
+```
+
+`r narrative_100k$chart2`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 15: Students per Teacher Ratio}
+**Figure 15.**
+
+```{r fig15}
+
+print(fig.15)
+```
+
+`r narrative_100k$chart3`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 16: Students per Total Central Office Administrative and Support Staff}
+**Figure 16.**
+
+```{r fig16}
+print(fig.16)
+```
+
+`r narrative_100k$chart4`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 17: Students per Total School Site Administrative and Support Staff}
+**Figure 17.**
+
+```{r fig17}
+print(fig.17)
+```
+
+`r narrative_100k$chart5`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 18: Students per Combined School and Central Office Administrative and Support Staff }
+**Figure 18.**
+
+```{r fig18}
+print(fig.18)
+```
+
+`r narrative_100k$chart6`
+
+\newpage
+
+
+# Workforce Composition of Only Council of the Great City Schools Districts
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 19: Student to Total District Staff Ratio}
+**Figure 19.**
+
+```{r fig19}
+print(fig.19)
+```
+
+`r narrative_cgcs$chart1`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 20: Teachers as a Percentage of Total Staff}
+**Figure 20.**
+
+```{r fig20}
+
+print(fig.20)
+```
+
+`r narrative_cgcs$chart2`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 21: Students per Teacher Ratio}
+**Figure 21.**
+
+```{r fig21}
+
+print(fig.21)
+```
+
+`r narrative_cgcs$chart3`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 22: Students per Total Central Office Administrative and Support Staff}
+**Figure 22.**
+
+```{r fig22}
+print(fig.22)
+```
+
+`r narrative_cgcs$chart4`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 23: Students per Total School Site Administrative and Support Staff}
+**Figure 23.**
+
+```{r fig23}
+print(fig.23)
+```
+
+`r narrative_cgcs$chart5`
+
+\newpage
+
+\addcontentsline{toc}{subsection}{Figure 24: Students per Combined School and Central Office Administrative and Support Staff }
+**Figure 24.**
+
+```{r fig24}
+print(fig.24)
+```
+
+`r narrative_cgcs$chart6`
+
+\newpage
+
+# Appendix
+
+\clearpage 
+
+\begin{landscape} 
+
+\pagestyle{empty}
+
+```{r appendix-table, results='asis'}
+library(knitr)
+library(kableExtra)
+
+appendix_cgcs_table <- appendix_cgcs_table %>%
+  rename(
+    District = District,
+    Enrollment = Enrollment,
+    `Total Staff` = Total_Staff,
+    `Pupil-Teacher` = Pupil_Teacher_Ratio,
+    `Pupil-Staff` = Pupil_Total_Staff_Ratio,
+    `Pupil-LEA Admin` = Pupil_LEA_Admin_Ratio,
+    `Pupil-School Admin` = Pupil_School_Admin_Ratio,
+    `Pupil-Total Admin` = Pupil_Total_Admin_Ratio
+  )
+
+kable(
+  appendix_cgcs_table,
+  format = "latex",
+  booktabs = TRUE,
+  longtable = TRUE,
+  caption = "Staffing Metrics for Council of the Great City Schools Districts"
+) %>%
+  kable_styling(
+    latex_options = c("repeat_header", "hold_position"),
+    font_size = 8)
+```
+
+\end{landscape} 
+
+\pagestyle{fancy}
