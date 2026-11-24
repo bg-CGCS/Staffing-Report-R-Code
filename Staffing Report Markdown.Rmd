@@ -2,10 +2,11 @@
 output:
   pdf_document:
     latex_engine: xelatex
-mainfont: Georgia
+mainfont: Calibri
 params:
   district_name: NULL
   state_name: NULL
+  district_leaid: NULL
 header-includes:
   - \usepackage{graphicx}
   - \usepackage{titlesec}
@@ -13,39 +14,51 @@ header-includes:
   - \usepackage{longtable}
   - \usepackage{booktabs}
   - \usepackage{fancyhdr}
+  - \usepackage{xcolor}
+  - \definecolor{navy}{RGB}{0, 84, 159}
+  - \usepackage[normalem]{ulem}
   - \titleformat{\section}{\centering\LARGE\bfseries}{\thesection}{1em}{}
+  
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
+  error = TRUE,
   echo = FALSE,
-  warning = FALSE,
-  message = FALSE,
+  warning = TRUE,
+  message = TRUE,
   fig.width = 10.5,
 fig.height = 7.5,
 dpi = 300
 )
 
-district_name <- params$district_name
-state_name <- params$state_name
+district_name <- "Jackson Public Schools"
+district_leaid <- 2802190
+state_name <- "MISSISSIPPI"
+
+#district_name <- params$district_name
+#district_leaid <- params$district_leaid
+#state_name <- params$state_name
 
 source(
   "Staffing Report Generator.R",
   local = TRUE
 )
+
+cat("Loaded Staffing Report Generator\n")
+
 ```
 
 ```{r narrative_text, include=FALSE}
 build_narratives <- function(sizex) {
 
   comparison_data <- chart.data.calc.fn(
-    select.district.state.data.function(
+    select.district.data.function(
       yearx = set.year,
+      leaidx = select.leaid,
       districtx = select.district,
       statex = select.state,
-      sizex = sizex
-    )
-  )
+      sizex = sizex))
 
   list(
     chart1 = chart_1_narrative_fn(
@@ -72,18 +85,17 @@ build_narratives <- function(sizex) {
 narrative_15k  <- build_narratives(15000)
 narrative_50k  <- build_narratives(50000)
 narrative_100k <- build_narratives(100000)
+
 ```
 
 ```{r CGCS_narrative_text, include=FALSE}
 build_cgcs_narratives <- function() {
 
   comparison_data <- chart.data.calc.fn(
-    select.cgcs.state.data.function(
-      yearx = set.year,
-      districtx = select.district,
-      statex = select.state
-    )
-  )
+  select.cgcs.state.data.function(
+    yearx = set.year,
+    leaidx = select.leaid,
+    statex = select.state))
 
   list(
     chart1 = chart_1_narrative_fn(comparison_data, select.district),
@@ -174,10 +186,16 @@ This report summarizes staffing information for **`r params$district_name`** in 
 
 \vspace*{\fill} 
 
-\addcontentsline{toc}{section}{Workforce Composition of School Districts with 15,000 or More Students}
+\addcontentsline{toc}{section}{Workforce Composition of School Districts with 15,000 or More Students} 
 
-\begin{center} {\LARGE\bfseries Workforce Composition of School Districts with 15,000 or More Students} 
-\end{center} \vspace*{\fill} 
+\begin{center} 
+{\Huge\bfseries 
+\uline{Workforce Composition of School Districts with}\\[0.4cm] 
+\uline{\textcolor{navy}{15,000 or More Students}} 
+} 
+\end{center} 
+
+\vspace*{\fill} 
 
 \newpage
 
@@ -250,15 +268,21 @@ print(fig.6)
 \newpage 
 \thispagestyle{empty} 
 
+\newpage 
+
 \vspace*{\fill} 
 
-\addcontentsline{toc}{section}{Workforce Composition of School Districts with 50,000 or More Students}
+\addcontentsline{toc}{section}{Workforce Composition of School Districts with 50,000 or More Students} 
 
 \begin{center} 
-{\LARGE\bfseries Workforce Composition of School Districts with 50,000 or More Students} 
-\end{center} 
+{\Huge\bfseries 
+\uline{Workforce Composition of School Districts with}\\[0.4cm] 
+\uline{\textcolor{navy}{50,000 or More Students}} 
+} 
+\end{center}  
 
 \vspace*{\fill} 
+
 \newpage
 
 \addcontentsline{toc}{subsection}{Figure 7: Student to Total District Staff Ratio}
@@ -327,9 +351,20 @@ print(fig.12)
 
 `r narrative_50k$chart6`
 
-\newpage
+\newpage 
 
-# Workforce Composition of School Districts with 100,000 or More Students
+\vspace*{\fill} 
+
+\addcontentsline{toc}{section}{Workforce Composition of School Districts with 100,000 or More Students} 
+
+\begin{center} 
+{\Huge\bfseries 
+\uline{Workforce Composition of School Districts with}\\[0.4cm] 
+\uline{\textcolor{navy}{100,000 or More Students}} 
+} 
+\end{center} 
+
+\vspace*{\fill} 
 
 \newpage
 
@@ -400,10 +435,20 @@ print(fig.18)
 
 `r narrative_100k$chart6`
 
-\newpage
+\newpage 
 
+\vspace*{\fill} 
 
-# Workforce Composition of Only Council of the Great City Schools Districts
+\addcontentsline{toc}{section}{Workforce Composition of Member Districts of the Council of the Great City Schools} 
+
+\begin{center} 
+{\Huge\bfseries 
+\uline{Workforce Composition of School Districts in}\\[0.4cm] 
+\uline{\textcolor{navy}{The Council of the Great City Schoools}} 
+} 
+\end{center}  
+
+\vspace*{\fill} 
 
 \newpage
 

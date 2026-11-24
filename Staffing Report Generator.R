@@ -16,17 +16,19 @@ set.year <- "2425"
 full.year <- "2024-2025"
 
 # Values supplied by report_template.Rmd
-select.district <- params$district_name
-select.state <- stringr::str_to_title(params$state_name)
+#select.district <- params$district_name
+#select.leaid <- params$district_leaid
+#select.state <- stringr::str_to_title(params$state_name)
 
 #Variables for testing REMOVE once finished
-#select.district <- "Los Angeles Unified School District"
-#select.state <- stringr::str_to_title("CALIFORNIA")
+select.district <- "Jackson Public Schools"
+select.leaid <- 2802190
+select.state <- stringr::str_to_title("MISSISSIPPI")
 
 #Custom colors
 color.set <- c(
   "Other Districts" = "blue",
-  "Mean" = "#e53f37",
+  "CGCS Mean" = "#e53f37",
   "Median" = "#60a862",
   setNames("#de8239", select.district),
   setNames("#f3d854", select.state)
@@ -34,37 +36,19 @@ color.set <- c(
 
 #Function to read in district data
 read.district.staff.fn <- function(yearx) {
-  read.csv(
+  district.data.raw <-  read.csv(
     paste0(
-      "C:/Users/bgarcia/OneDrive - Council of the Great City Schools/General/Research Requests/Staffing/R Code/Completed Reports/",
+      "C:/Users/bgarcia/OneDrive - Council of the Great City Schools/General/Research Requests/Staffing/Staffing-Report-R-Code/Completed Reports/",
       yearx,
       "/District.Staff.Slim_",
       yearx,
       ".csv"
     )
   )
-}
-
-#function to read in state data
-read.state.staff.fn <- function(yearx) {
-  read.csv(
-    paste0(
-      "C:/Users/bgarcia/OneDrive - Council of the Great City Schools/General/Research Requests/Staffing/R Code/Completed Reports/",
-      yearx,
-      "/State.Staff.Data_",
-      yearx,
-      ".csv"
-    )
-  )
-}
-
-#Create data set for districts
-#calculate mean and median before identifying select district and state
-#to allow the produced data set to be used across any district.
-district.data.function <- function(yearx, sizex) {
-  district.data <- read.district.staff.fn(yearx) %>%
+  dd.clean <- district.data.raw %>%
     select(
-      c("SCHOOL_YEAR",
+      c(
+        "SCHOOL_YEAR",
         "STATENAME",
         "LEAID",
         "LEA_NAME",
@@ -96,43 +80,26 @@ district.data.function <- function(yearx, sizex) {
         "Other.Staff"
       )
     )
-  
-  dd.set.enrollment <- district.data %>%
-    filter(Total_Enrollment > sizex)
-  
-  dd.set.enrollment$'chart marker' <- ""
-  
-  #calculate mean and median. add them as separate rows with dummy var markers
-  dd.mean <- dd.set.enrollment %>%
-    summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)))
-  
-  dd.mean$SCHOOL_YEAR <- full.year
-  dd.mean$STATENAME <- "Mean"
-  dd.mean$LEA_NAME <- "Mean"
-  dd.mean$'chart marker' <- "Mean"
-  dd.mean$LEAID <- 0
-  dd.mean$cgcsflag <- 0
-  
-  dd.median <- dd.set.enrollment %>%
-    summarise(across(where(is.numeric), ~ median(.x, na.rm = TRUE)))
-  
-  dd.median$SCHOOL_YEAR <- full.year
-  dd.median$STATENAME <- "Median"
-  dd.median$LEA_NAME <- "Median"
-  dd.median$'chart marker' <- "Median"
-  dd.median$LEAID <- 0
-  dd.median$cgcsflag <- 0
-  
-  #This file will save and be used by future functions to produce charts for designated
-  #year.
-  
-  dd.full.alpha <- dd.set.enrollment %>%
-    rbind(dd.mean) %>%
-    rbind(dd.median)
-  
-  return(dd.full.alpha)
+  return(dd.clean)
   
 }
+
+#function to read in state data
+read.state.staff.fn <- function(yearx) {
+  read.csv(
+    paste0(
+      "C:/Users/bgarcia/OneDrive - Council of the Great City Schools/General/Research Requests/Staffing/Staffing-Report-R-Code/Completed Reports/",
+      yearx,
+      "/State.Staff.Data_",
+      yearx,
+      ".csv"
+    )
+  )
+}
+
+#Create data set for districts
+#calculate CGCS Mean and median before identifying select district and state
+#to allow the produced data set to be used across any district.
 
 #pulling out state data for the selected district
 state.data.function <- function(yearx) {
@@ -165,7 +132,7 @@ state.data.function <- function(yearx) {
     mutate(LEA.Staff = rowSums(across(c(LEA.Administrators,
                                         LEA.Administrative.Support.Staff,
                                         Instructional.Coordinators.and.Supervisors.to.the.Staff
-                                        )), na.rm = TRUE))
+    )), na.rm = TRUE))
   
   
   state.data.t.ss.ad.counsel <- state.data.t.ss.administrators %>%
@@ -184,37 +151,81 @@ state.data.function <- function(yearx) {
 
 #District data and State data are complete. The following code is to specify the district and state in the data.
 #dummy variable column that indicates the select district.
-select.district.state.data.function <- function(yearx, districtx, statex, sizex) {
+select.district.data.function <- function(yearx, leaidx, districtx, statex, sizex) {
 
-  district <- district.data.function(yearx = yearx, sizex = sizex)
+  district <- read.district.staff.fn(yearx = yearx)
   
   dd.select <- district %>%
+    filter(LEAID == leaidx) %>%
     filter(LEA_NAME == districtx)
   
   dd.select$`chart marker` <- "District"
   
-  dd.other.15k <- district %>%
-    filter(LEA_NAME != districtx)
+  dd.other <- district %>%
+    filter(LEAID != leaidx) %>%
+    filter(Total_Enrollment > sizex)
+  
+  dd.other$`chart marker` <- ""
   
   state <- state.data.function(yearx)
-  
+   
   selected.state.data <- state %>%
     filter(STATENAME == statex) %>%
     mutate('chart marker' = "State")
   
   final.data.set <- dd.select %>%
-    rbind(dd.other.15k) %>%
+    rbind(dd.other) %>%
     rbind(selected.state.data)
   
   return(final.data.set)
-  }
+}
+
+mean.median.calculations <- function(yearx, leaidx, districtx, statex, sizex) {
+
+  dd.set.enrollment <- select.district.data.function(
+    yearx = yearx,
+    leaidx = leaidx,
+    districtx = districtx,
+    statex = statex,
+    sizex = sizex)
+  
+  #calculate CGCS Mean and median. add them as separate rows with dummy var markers
+  dd.mean <- dd.set.enrollment %>%
+    summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)))
+  
+  dd.mean$SCHOOL_YEAR <- full.year
+  dd.mean$STATENAME <- "CGCS Mean"
+  dd.mean$LEA_NAME <- "CGCS Mean"
+  dd.mean$'chart marker' <- "CGCS Mean"
+  dd.mean$LEAID <- 0
+  dd.mean$cgcsflag <- 0
+  
+  dd.median <- dd.set.enrollment %>%
+    summarise(across(where(is.numeric), ~ median(.x, na.rm = TRUE)))
+  
+  dd.median$SCHOOL_YEAR <- full.year
+  dd.median$STATENAME <- "Median"
+  dd.median$LEA_NAME <- "Median"
+  dd.median$'chart marker' <- "Median"
+  dd.median$LEAID <- 0
+  dd.median$cgcsflag <- 0
+  
+  #This file will save and be used by future functions to produce charts for designated
+  #year.
+  
+  dd.full.alpha <- dd.set.enrollment %>%
+    rbind(dd.mean) %>%
+    rbind(dd.median)
+  
+  return(dd.full.alpha)
+}
 
 #Function for the calculation of data for staffing charts.
 #District size if filtered before calculations are made
 chart.data.calc.fn <- function(datax) {
   #Calculations that are required for the charts.
   data <- datax %>%
-    mutate(across(c(Other.Staff, Guidance.Counselors), as.numeric))
+    mutate(across(any_of(c("Other.Staff", "Guidance.Counselors")),as.numeric))
   
   #Percent of staff that are teachers
   #Teachers/Total Staff
@@ -274,12 +285,18 @@ chart.data.calc.fn <- function(datax) {
   return(final.data)
 }
 
+calc.final.data.final <- chart.data.calc.fn(mean.median.calculations(set.year,
+                                                                     select.leaid,
+                                                                     select.district,
+                                                                     select.state,
+                                                                     50000))
+
 #Pull data together for the tables in the appendix
 CGCS.appendix.table.fn <- function(yearx) {
   cgcs_table <- chart.data.calc.fn(CGCS.data.function(yearx)) %>%
     
     # Remove the Mean and Median rows
-    filter(!LEA_NAME %in% c("Mean", "Median")) %>%
+    filter(!LEA_NAME %in% c("CGCS Mean", "Median")) %>%
     
     select(
       District = LEA_NAME,
@@ -320,7 +337,7 @@ build_caption <- function(chart.data,district_name,variable,percent = FALSE,meas
     pull(.data[[variable]])
   
   mean_value <- chart.data %>%
-    filter(`chart marker` == "Mean") %>%
+    filter(`chart marker` == "CGCS Mean") %>%
     pull(.data[[variable]])
   
   fmt <- function(x) {
@@ -333,7 +350,7 @@ build_caption <- function(chart.data,district_name,variable,percent = FALSE,meas
   
   stringr::str_wrap(
     glue::glue(
-      "Y-axis = {measure_name}; X-axis = ranking among all school districts in sample group. Each blue dot represents a school district. {district_name} had {fmt(district_value)}. The median for the Great City Schools was {fmt(median_value)}, and the mean was {fmt(mean_value)}."
+      "Y-axis = {measure_name}; X-axis = ranking among all school districts in sample group. Each blue dot represents a school district. {district_name} had {fmt(district_value)}. The median for the Great City Schools was {fmt(median_value)}, and the CGCS Mean was {fmt(mean_value)}."
     ),
     width = 135
   )
@@ -349,7 +366,7 @@ chart_1_narrative_fn <- function(chart.data, district_name) {
     pull(PUPADM)
   
   mean_value <- chart.data %>%
-    filter(`chart marker` == "Mean") %>%
+    filter(`chart marker` == "CGCS Mean") %>%
     pull(PUPADM)
   
   direction <- ifelse(
@@ -367,9 +384,9 @@ chart_1_narrative_fn <- function(chart.data, district_name) {
   )
   
   glue::glue(
-    "{district_name} had {round(district_value, 2)} students per staff member compared to the Great City School average of {round(mean_value, 2)} students per staff member.",
-    "In other words, {district_name} had {modifier} {direction} total staff than the average Great City School District.",
-    "The chart above compares {district_name} and other Great City School districts with data provided by the National Center for Education Statistics;")
+    "{district_name} had {round(district_value, 2)} students per administrative staff member compared to the Great City School average of {round(mean_value, 2)} students per staff member.",
+    "This indicates that {district_name} had {modifier} {direction} total staff members relative to its student enrollment than the average Great City School District.",
+    "The chart above compares student to staff ratios across Great City School districts using data from the National Center for Education Statistics (NCES);")
 }
 
 chart_2_narrative_fn <- function(chart.data, district_name) {
@@ -379,7 +396,7 @@ chart_2_narrative_fn <- function(chart.data, district_name) {
     pull(PCTTCH)
   
   mean_value <- chart.data %>%
-    filter(`chart marker` == "Mean") %>%
+    filter(`chart marker` == "CGCS Mean") %>%
     pull(PCTTCH)
   
   direction <- ifelse(
@@ -397,19 +414,20 @@ chart_2_narrative_fn <- function(chart.data, district_name) {
   )
   
   glue::glue(
-    "{district_name} had a {modifier} {direction} percentage of staff who were teachers than the average Great City School district, ",
-    "{round(district_value, 2)} vs. {round(mean_value, 2)}, respectively.",
+    "Teachers accounted for {scales::percent(district_value, accuracy = 0.1)}  of all staff in {district_name} , compared with the Great City School average of {scales::percent(mean_value, accuracy = 0.1)}",
+    "This indicates that teachers made up a {modifier} {direction} proportion of the district’s total workforce compared to the average Great City School District.",
     "The chart above compares {district_name} and other Great City School districts with data provided by the National Center for Education Statistics;")
 }
 
 chart_3_narrative_fn <- function(chart.data, district_name) {
-  
+#Smaller value is better  
+
   district_value <- chart.data %>%
     filter(`chart marker` == "District") %>%
     pull(PUPTCH)
   
   mean_value <- chart.data %>%
-    filter(`chart marker` == "Mean") %>%
+    filter(`chart marker` == "CGCS Mean") %>%
     pull(PUPTCH)
   
   student_direction <- ifelse(
@@ -431,10 +449,9 @@ chart_3_narrative_fn <- function(chart.data, district_name) {
   )
   
   glue::glue(
-    "{district_name} had {modifier} {student_direction} students per teacher than the average Great City School district, ",
-    "{round(district_value, 2)} vs. {round(mean_value, 2)}, respectively. ",
-    "In other words {district_name} had {modifier} {teacher_direction} teachers for its enrollment than did the average Great City School District",
-    "The chart above compares {district_name} and other Great City School districts with data provided by the National Center for Education Statistics.")
+    "{district_name}, there were {round(district_value, 2)} students per teacher, compared with the Great City School average of  {round(mean_value, 2)}.", 
+    "This indicates that {district_name} had {modifier} {teacher_direction} teachers relative to its student enrollment than the average Great City School district.",
+    "The chart above compares student-to-teacher ratios across Great City School districts using data from the National Center for Education Statistics (NCES).")
 }
 
 chart_4_narrative_fn <- function(chart.data, district_name) {
@@ -444,7 +461,7 @@ chart_4_narrative_fn <- function(chart.data, district_name) {
     pull(PUPLEA)
   
   mean_value <- chart.data %>%
-    filter(`chart marker` == "Mean") %>%
+    filter(`chart marker` == "CGCS Mean") %>%
     pull(PUPLEA)
   
   student_direction <- ifelse(
@@ -466,10 +483,9 @@ chart_4_narrative_fn <- function(chart.data, district_name) {
   )
   
   glue::glue(
-    "{district_name} had {modifier} {student_direction} students per central office administrative staff than the average Great City School district, ",
-    "{round(district_value, 2)} vs. {round(mean_value, 2)}, respectively. ",
-    "In other words {district_name} had {modifier} {teacher_direction} district-level administrators and support staff for a district its size than the average Great City School District",
-    "The chart above compares {district_name} and other Great City School districts with data provided by the National Center for Education Statistics;")
+    "In {district_name}, there were {round(district_value, 2)} students per central office administrative and support staff member, compared with the Great City School average of  {round(mean_value, 2)}.",
+    "This indicates that {district_name} had {modifier} {student_direction} central office administrative and support staff relative to its student enrollment than the average Great City School district.",
+    "The chart above compares central office staffing ratios across Great City School districts using data from the National Center for Education Statistics;")
 }
 
 chart_5_narrative_fn <- function(chart.data, district_name) {
@@ -479,7 +495,7 @@ chart_5_narrative_fn <- function(chart.data, district_name) {
     pull(PUPSCH)
   
   mean_value <- chart.data %>%
-    filter(`chart marker` == "Mean") %>%
+    filter(`chart marker` == "CGCS Mean") %>%
     pull(PUPSCH)
   
   student_direction <- ifelse(
@@ -514,7 +530,7 @@ chart_6_narrative_fn <- function(chart.data, district_name) {
     pull(PUPSTF)
   
   mean_value <- chart.data %>%
-    filter(`chart marker` == "Mean") %>%
+    filter(`chart marker` == "CGCS Mean") %>%
     pull(PUPSTF)
   
   student_direction <- ifelse(
@@ -552,80 +568,58 @@ cgcs_theme <- function(base_size = 14) {
       plot.background = element_rect(
         fill = "white",
         color = "#D9D9D9",
-        linewidth = 1
-      ),
+        linewidth = 1),
       panel.background = element_rect(fill = "white", color = NA),
       panel.border = element_rect(
         fill = NA,
         color = "#BFBFBF",
-        linewidth = 0.8
-      ),
-      
+        linewidth = 0.8),
       # ===== Gridlines =====
       panel.grid.major.y = element_line(color = "#E6E6E6", linewidth = 0.4),
       panel.grid.major.x = element_line(color = "#E6E6E6", linewidth = 0.4),
       panel.grid.minor = element_blank(),
-      
       # ===== Axes =====
       axis.line = element_blank(),
       axis.ticks = element_blank(),
-      
       axis.title.x = element_text(
         size = base_size,
         face = "bold",
-        margin = margin(t = 10)
-      ),
-      
+        margin = margin(t = 10)),
       axis.title.y = element_text(
         size = base_size,
         face = "bold",
-        margin = margin(r = 10)
-      ),
-      
+        margin = margin(r = 10)),
       axis.text = element_text(size = 14, color = "#4D4D4D"),
-      
       # ===== Title =====
       plot.title = element_text(
         size = base_size + 4,
         face = "bold",
         hjust = 0.5,
-        color = "#1F1F1F"
-      ),
-      
+        color = "#1F1F1F"),
       plot.subtitle = element_text(
         size = base_size - 2,
         hjust = 0.5,
-        color = "#666666"
-      ),
-      
+        color = "#666666"),
       # ===== Caption =====
       plot.caption.position = "plot",
-      
       plot.caption = element_text(
         hjust = 0,
         size = 12,
         face = "italic",
-        colour = "#666666"
-      ),
-      
+        colour = "#666666"),
       # ===== Legend =====
       legend.position = "bottom",
       legend.direction = "horizontal",
       legend.title = element_blank(),
-      
       legend.text = element_text(size = 12, color = "#404040"),
-      
       legend.background = element_blank(),
       legend.key = element_blank(),
-      
       # ===== Margins =====
       plot.margin = margin(
         t = 15,
         r = 20,
         b = 15,
-        l = 20
-      )
-    )
+        l = 20))
 }
 
 cgcs_legend <- guides(
@@ -638,17 +632,17 @@ cgcs_legend <- guides(
 #Chart Functions
 Percent.of.Staff.that.are.Teachers.fn <- function(data.group,year.a,size.a,district.a,state.a) {
   
-  chart.data <- chart.data.calc.fn(datax = select.district.state.data.function(
-    yearx = year.a,
-    districtx = district.a,
-    statex = state.a,
-    sizex = size.a
-  ))
+  chart.data <- chart.data.calc.fn(
+    mean.median.calculations(
+      yearx = year.a,
+      leaidx = select.leaid,
+      statex = state.a,
+      sizex = size.a))
   
   chart.data <- chart.data %>%
     mutate(legend_group = case_when(
         `chart marker` == "District" ~ district.a,
-        `chart marker` == "Mean" ~ "Mean",
+        `chart marker` == "CGCS Mean" ~ "CGCS Mean",
         `chart marker` == "Median" ~ "Median",
         `chart marker` == "State" ~ state.a,
         TRUE ~ "Other Districts")) %>%
@@ -671,18 +665,39 @@ Percent.of.Staff.that.are.Teachers.fn <- function(data.group,year.a,size.a,distr
     geom_point(
       data = filter(
         chart.data.plot,
-        !legend_group %in% c(select.district, select.state, "Mean", "Median")
+        !legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
       ),
       size = 2.8,
       alpha = 0.45
     ) +
     # Plot highlighted groups last to ensure they are visible at the front
+    # Glow layer 1
     geom_point(
       data = filter(
         chart.data.plot,
-        legend_group %in% c(select.district, select.state, "Mean", "Median")
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
       ),
-      size = 5,
+      size = 12,
+      alpha = 0.15
+    ) +
+    
+    # Glow layer 2
+    geom_point(
+      data = filter(
+        chart.data.plot,
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
+      ),
+      size = 9,
+      alpha = 0.25
+    ) +
+    
+    # Main point
+    geom_point(
+      data = filter(
+        chart.data.plot,
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
+      ),
+      size = 6,
       stroke = 1.2
     ) +
     scale_color_manual(values = color.set) +
@@ -690,40 +705,48 @@ Percent.of.Staff.that.are.Teachers.fn <- function(data.group,year.a,size.a,distr
     scale_y_continuous(labels = scales::percent_format(scale = 100)) +
     labs(x = "District Ranking",
          y = "Percent",
-         title = stringr::str_wrap(paste0("Teachers as a Percentage of Total Staff in ",select.district," and Great City School Districts"), width = 50),
+         title = paste0("Teachers as a Percentage of Total Staff in\n ",
+                        select.district,
+                        "\n and Great City School Districts"),
          subtitle = paste0("Districts with ",size.a," students or more"),
          caption = caption_text,
          color = NULL) +
     cgcs_theme() +
     cgcs_legend +
-  #Plot that overlays the data points for Mean Median, Select district and State. 
-  geom_text_repel(
-    data = filter(
-      chart.data.plot,
-      legend_group %in% c(select.district, select.state, "Mean", "Median")),
-    aes(label = paste0(
-      legend_group, ": ", scales::percent(.data[[data.group]], accuracy = 0.1))),
-    size = 4,
-    show.legend = FALSE,
-    box.padding = 0.5,
-    point.padding = 0.3,
-    max.overlaps = Inf  )
+  #Plot that overlays the data points for CGCS Mean Median, Select district and State. 
+    geom_text_repel(
+      data = filter(
+        chart.data.plot,
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
+      ),
+      aes(label = scales::percent(.data[[data.group]], accuracy = 0.1)),
+      direction = "y",
+      vjust = -3,
+      point.padding = 2.5,
+      box.padding = 0.4,
+      segment.color = "grey60",
+      segment.size = 0.4,
+      size = 4,
+      fontface = "bold",
+      max.overlaps = Inf,
+      show.legend = FALSE
+    )
 }
 
 Pupil.to.Teacher.Ratio.fn <- function(data.group,year.a,size.a,district.a,state.a) {
   
-  chart.data <- chart.data.calc.fn(datax = select.district.state.data.function(
-    yearx = year.a,
-    districtx = district.a,
-    statex = state.a,
-    sizex = size.a
-  ))
+  chart.data <- chart.data.calc.fn(
+    mean.median.calculations(
+      yearx = year.a,
+      leaidx = select.leaid,
+      statex = state.a,
+      sizex = size.a))
   
   chart.data <- chart.data %>%
     mutate(
       legend_group = case_when(
         `chart marker` == "District" ~ district.a,
-        `chart marker` == "Mean" ~ "Mean",
+        `chart marker` == "CGCS Mean" ~ "CGCS Mean",
         `chart marker` == "Median" ~ "Median",
         `chart marker` == "State" ~ state.a,
         TRUE ~ "Other Districts"
@@ -737,11 +760,11 @@ Pupil.to.Teacher.Ratio.fn <- function(data.group,year.a,size.a,district.a,state.
   Q3 <- quantile(chart.data[[data.group]], 0.75, na.rm = TRUE)
   iqr <- IQR(chart.data[[data.group]], na.rm = TRUE)
   
-  #The outlier check does not affect the district, state, mean or median
+  #The outlier check does not affect the district, state, CGCS Mean or median
   chart.data.plot <- chart.data %>%
     filter(legend_group %in% c(select.district,
                                select.state,
-                               "Mean",
+                               "CGCS Mean",
                                "Median") |
         #Range set to 1.5, increase if there are legitimate districts being removed
              between(.data[[data.group]],
@@ -762,7 +785,7 @@ Pupil.to.Teacher.Ratio.fn <- function(data.group,year.a,size.a,district.a,state.
     geom_point(
       data = filter(
         chart.data.plot,
-        !legend_group %in% c(select.district, select.state, "Mean", "Median")
+        !legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
       ),
       size = 3,
       alpha = 0.7
@@ -772,7 +795,7 @@ Pupil.to.Teacher.Ratio.fn <- function(data.group,year.a,size.a,district.a,state.
     geom_point(
       data = filter(
         chart.data.plot,
-        legend_group %in% c(select.district, select.state, "Mean", "Median")
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
       ),
       size = 5,
       alpha = 1
@@ -782,29 +805,43 @@ Pupil.to.Teacher.Ratio.fn <- function(data.group,year.a,size.a,district.a,state.
     scale_y_continuous(breaks = scales::pretty_breaks(n=6)) +
     labs(x = "District Ranking", 
          y = "Ratio",
-         title = stringr::str_wrap(paste0("Students per Teacher in ",select.district," and Great City School Districts"), width = 50),
+         title = paste0("Students per Teacher in\n ",
+                        select.district,
+                        "\nand Great City School Districts"),
          subtitle = paste0("Districts with ",size.a," students or more"),
          caption = caption_text,
          color = NULL) +
     cgcs_theme() +
-    cgcs_legend
+    cgcs_legend+
+    #Plot that overlays the data points for CGCS Mean Median, Select district and State. 
+    geom_text_repel(
+      data = filter(
+        chart.data.plot,
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")),
+      aes(label = round(.data[[data.group]], 1)),
+      color = "Black",
+      size = 4,
+      fontface = "bold",
+      show.legend = FALSE,
+      box.padding = 0.5,
+      point.padding = 0.3,
+      max.overlaps = Inf  )
 }
 
-chart.large.to.small.fn <- function(data.group,titlex,year.a,size.a,district.a,state.a,measure.a) {
+chart.large.to.small.fn <- function(data.group,titlex,year.a,size.a,district.a,leaid.a,state.a,measure.a) {
   
   chart.data <- chart.data.calc.fn(
-    select.district.state.data.function(
-    yearx = year.a,
-    sizex = size.a,
-    districtx = district.a,
-    statex = state.a
-    )
-  )
+    mean.median.calculations(
+      yearx = year.a,
+      leaidx = select.leaid,
+      statex = state.a,
+      sizex = size.a))
+  
   chart.data <- chart.data %>%
     mutate(
       legend_group = case_when(
         `chart marker` == "District" ~ select.district,
-        `chart marker` == "Mean" ~ "Mean",
+        `chart marker` == "CGCS Mean" ~ "CGCS Mean",
         `chart marker` == "Median" ~ "Median",
         `chart marker` == "State" ~ select.state,
         TRUE ~ "Other Districts"
@@ -818,11 +855,11 @@ chart.large.to.small.fn <- function(data.group,titlex,year.a,size.a,district.a,s
   Q3 <- quantile(chart.data[[data.group]], 0.75, na.rm = TRUE)
   iqr <- IQR(chart.data[[data.group]], na.rm = TRUE)
   
-  #The outlier check does not affect the district, state, mean or median
+  #The outlier check does not affect the district, state, CGCS Mean or median
   chart.data.plot <- chart.data %>%
     filter(legend_group %in% c(select.district,
                                select.state,
-                               "Mean",
+                               "CGCS Mean",
                                "Median") |
              #Range set to 1.5, increase if there are legitimate districts being removed
              between(.data[[data.group]],
@@ -843,174 +880,251 @@ chart.large.to.small.fn <- function(data.group,titlex,year.a,size.a,district.a,s
     # Plot all other districts first
     geom_point(
       data = filter(
-        chart.data.plot,!legend_group %in% c(select.district, select.state, "Mean", "Median")
-      ),
+        chart.data.plot,!legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")),
      size = 2.8,
-      alpha = 0.45
-    ) +
+      alpha = 0.45) +
     # Plot highlighted groups last
     geom_point(
       data = filter(
         chart.data.plot,
-        legend_group %in% c(select.district, select.state, "Mean", "Median")
-      ),
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")),
       size = 5,
-      stroke = 1.2
-    ) +
+      stroke = 1.2) +
     scale_color_manual(values = color.set) +
     scale_x_continuous(breaks = seq(0, max(chart.data.plot$rank), by = 50)) +
     scale_y_continuous() +
     labs(x = "District Ranking",
          y = "Ratio", 
-         title = stringr::str_wrap(titlex, width = 50),
+         title = titlex,
          subtitle = paste0("Districts with ",size.a," students or more"),
          caption = caption_text,
          color = NULL) +
     cgcs_theme() +
-    cgcs_legend
+    cgcs_legend+
+  #Plot that overlays the data points for CGCS Mean Median, Select district and State. 
+ geom_text_repel(
+    data = filter(
+      chart.data.plot,
+      legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
+    ),
+    aes(label = round(.data[[data.group]], 1)),
+    color = "Black",
+    direction = "y",
+    vjust = -3,
+    point.padding = 2.5,
+    box.padding = 0.4,
+    segment.color = "grey60",
+    segment.size = 0.4,
+    size = 4,
+    fontface = "bold",
+    max.overlaps = Inf,
+    show.legend = FALSE
+  )
 }
 
 #Chart 1 Student to Total District Staff Ratio in DISTRICTX and Great City School Districts
-fig.1 <- chart.large.to.small.fn(  "PUPADM",
-                                   paste0("Student to Total District Staff Ratio in ",select.district," and Great City School Districts"),
-                                   set.year,
-                                   15000,
-                                   select.district,
-                                   select.state,
-                                   "number of students-to-total staff")
+fig.1 <- chart.large.to.small.fn(
+  data.group = "PUPADM",
+  titlex =  paste0("Student to Total District Staff Ratio in\n ",select.district,"\n and Great City School Districts"),
+  year.a =  set.year,
+  size.a =  15000,
+  district.a =  select.district,
+  leaid.a =  select.leaid,
+ state.a =  select.state,
+ measure.a = "number of students-to-total staff")
+
+fig.1
+
 #Chart 2 Teachers as a Percentage of Total Staff in DISTRICTX and Great City School Districts
-fig.2 <- Percent.of.Staff.that.are.Teachers.fn("PCTTCH", 
-                                               set.year, 
-                                               15000, 
-                                               select.district, 
-                                               select.state)
+fig.2 <- Percent.of.Staff.that.are.Teachers.fn("PCTTCH", set.year, 15000, select.district, select.state)
+
+fig.2
 #Chart 3 Students per Teacher in DISTRICTX and Great City School Districts
-fig.3 <- Pupil.to.Teacher.Ratio.fn("PUPTCH", 
-                                   set.year, 
-                                   15000, 
-                                   select.district, 
-                                   select.state)
+fig.3 <- Pupil.to.Teacher.Ratio.fn("PUPTCH", set.year, 15000, select.district, select.state)
+fig.3
 #Chart 4 Students per Total Central Office Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.4 <- chart.large.to.small.fn("PUPLEA",
-                                 paste0("Students per Total Central Office Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 15000,
-                                 select.district,
-                                 select.state,
-                                 "number of students per central office administrative and support staff.")
+fig.4 <- chart.large.to.small.fn(
+  "PUPLEA",
+  paste0(
+    "Students per Total Central Office Administrative and Support Staff in\n ",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  15000,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per central office administrative and support staff."
+)
+
+fig.4
+
 #Chart 5 Students per Total School Site Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.5 <- chart.large.to.small.fn("PUPSCH",
-                                 paste0("Students per Total School Site Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 15000,
-                                 select.district,
-                                 select.state,
-                                 "number of students per administrator")
+fig.5 <- chart.large.to.small.fn(
+  "PUPSCH",
+  paste0(
+    "Students per Total School Site Administrative and Support Staff in \n",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  15000,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per administrator"
+)
 #Chart 6 Students per Combined School and Central Office Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.6 <- chart.large.to.small.fn("PUPSTF",
-                                 paste0("Students per Combined School and Central Office Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 15000,
-                                 select.district,
-                                 select.state,
-                                 "number of students per combined school-based and central office administrators and support staff")
+fig.6 <- chart.large.to.small.fn(
+  "PUPSTF",
+  paste0(
+    "Students per Combined School and Central Office Administrative and Support Staff in \n",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  15000,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per combined school-based and central office administrators and support staff"
+)
 
 #Districts with Enrollments of 50K or greater
 #Chart 1 Student to Total District Staff Ratio in DISTRICTX and Great City School Districts
-fig.7 <- chart.large.to.small.fn(  "PUPADM",
-                                   paste0("Student to Total District Staff Ratio in ",select.district," and Great City School Districts"),
-                                   set.year,
-                                   50000,
-                                   select.district,
-                                   select.state,
-                                   "number of students-to-total staff")
+fig.7 <- chart.large.to.small.fn(
+  "PUPADM",
+  paste0("Student to Total District Staff Ratio in\n ",select.district,"\n and Great City School Districts"),
+  set.year,
+  50000,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students-to-total staff"
+)
+
+
 #Chart 2 Teachers as a Percentage of Total Staff in DISTRICTX and Great City School Districts
-fig.8 <- Percent.of.Staff.that.are.Teachers.fn("PCTTCH", 
-                                               set.year, 
-                                               50000, 
-                                               select.district, 
-                                               select.state)
+fig.8 <- Percent.of.Staff.that.are.Teachers.fn("PCTTCH", set.year, 50000, select.district, select.state)
 #Chart 3 Students per Teacher in DISTRICTX and Great City School Districts
-fig.9 <- Pupil.to.Teacher.Ratio.fn("PUPTCH", 
-                                   set.year, 
-                                   50000, 
-                                   select.district, 
-                                   select.state)
+fig.9 <- Pupil.to.Teacher.Ratio.fn("PUPTCH", set.year, 50000, select.district, select.state)
 #Chart 4 Students per Total Central Office Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.10 <- chart.large.to.small.fn("PUPLEA",
-                                 paste0("Students per Total Central Office Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 50000,
-                                 select.district,
-                                 select.state,
-                                 "number of students per central office administrative and support staff.")
+fig.10 <- chart.large.to.small.fn(
+  "PUPLEA",
+  paste0(
+    "Students per Total Central Office Administrative and Support Staff in\n ",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  50000,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per central office administrative and support staff."
+)
 #Chart 5 Students per Total School Site Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.11 <- chart.large.to.small.fn("PUPSCH",
-                                 paste0("Students per Total School Site Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 50000,
-                                 select.district,
-                                 select.state,
-                                 "number of students per administrator")
+fig.11 <- chart.large.to.small.fn(
+  "PUPSCH",
+  paste0(
+    "Students per Total School Site Administrative and Support Staff in\n ",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  50000,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per administrator"
+)
 #Chart 6 Students per Combined School and Central Office Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.12 <- chart.large.to.small.fn("PUPSTF",
-                                 paste0("Students per Combined School and Central Office Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 50000,
-                                 select.district,
-                                 select.state,
-                                 "number of students per combined school-based and central office administrators and support staff")
+fig.12 <- chart.large.to.small.fn(
+  "PUPSTF",
+  paste0(
+    "Students per Combined School and Central Office Administrative and Support Staff in\n ",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  50000,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per combined school-based and central office administrators and support staff"
+)
 
 #Districts with enrollments over 100k
 #Chart 1 Student to Total District Staff Ratio in DISTRICTX and Great City School Districts
-fig.13 <- chart.large.to.small.fn(  "PUPADM",
-                                   paste0("Student to Total District Staff Ratio in ",select.district," and Great City School Districts"),
-                                   set.year,
-                                   100000,
-                                   select.district,
-                                   select.state,
-                                   "number of students-to-total staff")
+fig.13 <- chart.large.to.small.fn(
+  "PUPADM",
+  paste0(
+    "Student to Total District Staff Ratio in\n ",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  100000,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students-to-total staff"
+)
 #Chart 2 Teachers as a Percentage of Total Staff in DISTRICTX and Great City School Districts
-fig.14 <- Percent.of.Staff.that.are.Teachers.fn("PCTTCH", 
-                                               set.year, 
-                                               100000, 
-                                               select.district, 
-                                               select.state)
+fig.14 <- Percent.of.Staff.that.are.Teachers.fn("PCTTCH", set.year, 100000, select.district, select.state)
 #Chart 3 Students per Teacher in DISTRICTX and Great City School Districts
-fig.15 <- Pupil.to.Teacher.Ratio.fn("PUPTCH", 
-                                   set.year, 
-                                   100000, 
-                                   select.district, 
-                                   select.state)
+fig.15 <- Pupil.to.Teacher.Ratio.fn("PUPTCH", set.year, 100000, select.district, select.state)
 #Chart 4 Students per Total Central Office Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.16 <- chart.large.to.small.fn("PUPLEA",
-                                 paste0("Students per Total Central Office Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 100000,
-                                 select.district,
-                                 select.state,
-                                 "number of students per central office administrative and support staff.")
+fig.16 <- chart.large.to.small.fn(
+  "PUPLEA",
+  paste0(
+    "Students per Total Central Office Administrative and Support Staff in\n ",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  100000,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per central office administrative and support staff."
+)
 #Chart 5 Students per Total School Site Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.17 <- chart.large.to.small.fn("PUPSCH",
-                                 paste0("Students per Total School Site Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 100000,
-                                 select.district,
-                                 select.state,
-                                 "number of students per administrator")
+fig.17 <- chart.large.to.small.fn(
+  "PUPSCH",
+  paste0(
+    "Students per Total School Site Administrative and Support Staff in\n ",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  100000,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per administrator"
+)
 #Chart 6 Students per Combined School and Central Office Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.18 <- chart.large.to.small.fn("PUPSTF",
-                                 paste0("Students per Combined School and Central Office Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 100000,
-                                 select.district,
-                                 select.state,
-                                 "number of students per combined school-based and central office administrators and support staff")
+fig.18 <- chart.large.to.small.fn(
+  "PUPSTF",
+  paste0(
+    "Students per Combined School and Central Office Administrative and Support Staff in\n ",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  100000,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per combined school-based and central office administrators and support staff"
+)
 
 #CGCS Districts only
 #A number of the functions have to be modified to filter for just Council
 #District filtering sill takes place in district.data.filter renamed to cgcs.data.function
-#Function filters for cgcs only districts then calculates mean & median
+#Function filters for cgcs only districts then calculates CGCS Mean & median
 CGCS.data.function <- function(yearx) {
   district.data <- read.district.staff.fn(yearx) %>%
     select(
@@ -1050,14 +1164,14 @@ CGCS.data.function <- function(yearx) {
   
   dd.set.enrollment$'chart marker' <- ""
   
-  #calculate mean and median. add them as separate rows with dummy var markers
+  #calculate CGCS Mean and median. add them as separate rows with dummy var markers
   dd.mean <- dd.set.enrollment %>%
     summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)))
   
   dd.mean$SCHOOL_YEAR <- full.year
-  dd.mean$STATENAME <- "Mean"
-  dd.mean$LEA_NAME <- "Mean"
-  dd.mean$'chart marker' <- "Mean"
+  dd.mean$STATENAME <- "CGCS Mean"
+  dd.mean$LEA_NAME <- "CGCS Mean"
+  dd.mean$'chart marker' <- "CGCS Mean"
   dd.mean$LEAID <- 0
   dd.mean$cgcsflag <- 0
   
@@ -1084,16 +1198,19 @@ CGCS.data.function <- function(yearx) {
 
 #District data and State data are complete. The following code is to specify the district and state in the data.
 #dummy variable column that indicates the select district.
-select.cgcs.state.data.function <- function(yearx, districtx, statex) {
+select.cgcs.state.data.function <- function(yearx, leaidx, districtx, statex) {
   district <- CGCS.data.function(yearx = yearx)
   
   dd.select <- district %>%
-    filter(LEA_NAME == districtx)
+    filter(LEAID == leaidx) %>%
+    filter(cgcsflag == 1)
   
   dd.select$`chart marker` <- "District"
   
-  dd.other.15k <- district %>%
-    filter(LEA_NAME != districtx)
+  dd.other <- district %>%
+    filter(LEAID != leaidx)
+  
+  dd.other$`chart marker` <- ""
   
   state <- state.data.function(yearx)
   
@@ -1102,31 +1219,72 @@ select.cgcs.state.data.function <- function(yearx, districtx, statex) {
     mutate('chart marker' = "State")
   
   final.data.set <- dd.select %>%
-    rbind(dd.other.15k) %>%
+    rbind(dd.other) %>%
     rbind(selected.state.data)
-  
+ 
   return(final.data.set)
-  
 }
 
+CGCS.mean.median.calculations <- function(yearx, leaidx, statex, sizex) {
+  
+  dd.set.enrollment <- select.cgcs.state.data.function(
+    yearx = yearx,
+    leaidx = leaidx,
+    statex = statex)
+  
+  #calculate CGCS Mean and median. add them as separate rows with dummy var markers
+  dd.mean <- dd.set.enrollment %>%
+    summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)))
+  
+  dd.mean$SCHOOL_YEAR <- full.year
+  dd.mean$STATENAME <- "CGCS Mean"
+  dd.mean$LEA_NAME <- "CGCS Mean"
+  dd.mean$'chart marker' <- "CGCS Mean"
+  dd.mean$LEAID <- 0
+  dd.mean$cgcsflag <- 0
+  
+  dd.median <- dd.set.enrollment %>%
+    summarise(across(where(is.numeric), ~ median(.x, na.rm = TRUE)))
+  
+  dd.median$SCHOOL_YEAR <- full.year
+  dd.median$STATENAME <- "Median"
+  dd.median$LEA_NAME <- "Median"
+  dd.median$'chart marker' <- "Median"
+  dd.median$LEAID <- 0
+  dd.median$cgcsflag <- 0
+  
+  #This file will save and be used by future functions to produce charts for designated
+  #year.
+  
+  dd.full.alpha <- dd.set.enrollment %>%
+    rbind(dd.mean) %>%
+    rbind(dd.median)
+  
+  return(dd.full.alpha)
+}
 #Charts for the report
+#Chart Functions
 #Chart Functions
 CGCS.Percent.of.Staff.that.are.Teachers.fn <- function(data.group,year.a,district.a,state.a) {
   
-  chart.data <- chart.data.calc.fn(datax = select.cgcs.state.data.function(
-    yearx = year.a,
-    districtx = district.a,
-    statex = state.a))
+   chart.data <- chart.data.calc.fn(
+     CGCS.mean.median.calculations(
+      yearx = year.a,
+      leaidx = select.leaid,
+      statex = state.a))
   
   chart.data <- chart.data %>%
     mutate(legend_group = case_when(
       `chart marker` == "District" ~ district.a,
-      `chart marker` == "Mean" ~ "Mean",
+      `chart marker` == "CGCS Mean" ~ "CGCS Mean",
       `chart marker` == "Median" ~ "Median",
       `chart marker` == "State" ~ state.a,
       TRUE ~ "Other Districts")) %>%
     mutate(plot_order = ifelse(legend_group == select.district, 1, 0)) %>%
     arrange(plot_order)
+  
+  print(data.group)
+  print(names(chart.data))
   
   chart.data.plot <- chart.data %>%
     arrange(desc(.data[[data.group]])) %>%
@@ -1144,18 +1302,39 @@ CGCS.Percent.of.Staff.that.are.Teachers.fn <- function(data.group,year.a,distric
     geom_point(
       data = filter(
         chart.data.plot,
-        !legend_group %in% c(select.district, select.state, "Mean", "Median")
+        !legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
       ),
       size = 2.8,
       alpha = 0.45
     ) +
     # Plot highlighted groups last to ensure they are visible at the front
+    # Glow layer 1
     geom_point(
       data = filter(
         chart.data.plot,
-        legend_group %in% c(select.district, select.state, "Mean", "Median")
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
       ),
-      size = 5,
+      size = 12,
+      alpha = 0.15
+    ) +
+    
+    # Glow layer 2
+    geom_point(
+      data = filter(
+        chart.data.plot,
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
+      ),
+      size = 9,
+      alpha = 0.25
+    ) +
+    
+    # Main point
+    geom_point(
+      data = filter(
+        chart.data.plot,
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
+      ),
+      size = 6,
       stroke = 1.2
     ) +
     scale_color_manual(values = color.set) +
@@ -1163,26 +1342,47 @@ CGCS.Percent.of.Staff.that.are.Teachers.fn <- function(data.group,year.a,distric
     scale_y_continuous(labels = scales::percent_format(scale = 100)) +
     labs(x = "District Ranking",
          y = "Percent",
-         title = stringr::str_wrap(paste0("Teachers as a Percentage of Total Staff in ",select.district," and Great City School Districts"), width = 50),
-         subtitle = paste0("All CGCS Districts"),
+         title = paste0("Teachers as a Percentage of Total Staff in\n ",
+                        select.district,
+                        "\n and Great City School Districts"),
+         subtitle = paste0("CGCS Member Districts"),
          caption = caption_text,
          color = NULL) +
     cgcs_theme() +
-    cgcs_legend
+    cgcs_legend +
+    #Plot that overlays the data points for CGCS Mean Median, Select district and State. 
+    geom_text_repel(
+      data = filter(
+        chart.data.plot,
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
+      ),
+      aes(label = scales::percent(.data[[data.group]], accuracy = 0.1)),
+      direction = "y",
+      vjust = -3,
+      point.padding = 2.5,
+      box.padding = 0.4,
+      segment.color = "grey60",
+      segment.size = 0.4,
+      size = 4,
+      fontface = "bold",
+      max.overlaps = Inf,
+      show.legend = FALSE
+    )
 }
 
 CGCS.Pupil.to.Teacher.Ratio.fn <- function(data.group,year.a,district.a,state.a) {
   
-  chart.data <- chart.data.calc.fn(datax = select.cgcs.state.data.function(
-    yearx = year.a,
-    districtx = district.a,
-    statex = state.a))
+  chart.data <- chart.data.calc.fn(
+    CGCS.mean.median.calculations(
+      yearx = year.a,
+      leaidx = select.leaid,
+      statex = state.a))
   
   chart.data <- chart.data %>%
     mutate(
       legend_group = case_when(
         `chart marker` == "District" ~ district.a,
-        `chart marker` == "Mean" ~ "Mean",
+        `chart marker` == "CGCS Mean" ~ "CGCS Mean",
         `chart marker` == "Median" ~ "Median",
         `chart marker` == "State" ~ state.a,
         TRUE ~ "Other Districts"
@@ -1196,11 +1396,11 @@ CGCS.Pupil.to.Teacher.Ratio.fn <- function(data.group,year.a,district.a,state.a)
   Q3 <- quantile(chart.data[[data.group]], 0.75, na.rm = TRUE)
   iqr <- IQR(chart.data[[data.group]], na.rm = TRUE)
   
-  #The outlier check does not affect the district, state, mean or median
+  #The outlier check does not affect the district, state, CGCS Mean or median
   chart.data.plot <- chart.data %>%
     filter(legend_group %in% c(select.district,
                                select.state,
-                               "Mean",
+                               "CGCS Mean",
                                "Median") |
              #Range set to 1.5, increase if there are legitimate districts being removed
              between(.data[[data.group]],
@@ -1221,7 +1421,7 @@ CGCS.Pupil.to.Teacher.Ratio.fn <- function(data.group,year.a,district.a,state.a)
     geom_point(
       data = filter(
         chart.data.plot,
-        !legend_group %in% c(select.district, select.state, "Mean", "Median")
+        !legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
       ),
       size = 3,
       alpha = 0.7
@@ -1231,7 +1431,7 @@ CGCS.Pupil.to.Teacher.Ratio.fn <- function(data.group,year.a,district.a,state.a)
     geom_point(
       data = filter(
         chart.data.plot,
-        legend_group %in% c(select.district, select.state, "Mean", "Median")
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
       ),
       size = 5,
       alpha = 1
@@ -1241,27 +1441,42 @@ CGCS.Pupil.to.Teacher.Ratio.fn <- function(data.group,year.a,district.a,state.a)
     scale_y_continuous(breaks = scales::pretty_breaks(n=6)) +
     labs(x = "District Ranking", 
          y = "Ratio",
-         title = stringr::str_wrap(paste0("Students per Teacher in ",select.district," and Great City School Districts"), width = 50),
-         subtitle = "All CGCS Districts",
+         title = paste0("Students per Teacher in\n ",
+                        select.district,
+                        "\nand Great City School Districts"),
+         subtitle = paste0("CGCS Member Districts"),
          caption = caption_text,
          color = NULL) +
     cgcs_theme() +
-    cgcs_legend
+    cgcs_legend+
+    #Plot that overlays the data points for CGCS Mean Median, Select district and State. 
+    geom_text_repel(
+      data = filter(
+        chart.data.plot,
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")),
+      aes(label = round(.data[[data.group]], 1)),
+      color = "Black",
+      size = 4,
+      fontface = "bold",
+      show.legend = FALSE,
+      box.padding = 0.5,
+      point.padding = 0.3,
+      max.overlaps = Inf  )
 }
 
-CGCS.chart.large.to.small.fn <- function(data.group,titlex,year.a,district.a,state.a,measure.a) {
+CGCS.chart.large.to.small.fn <- function(data.group,titlex,year.a,district.a,leaid.a,state.a,measure.a) {
   
   chart.data <- chart.data.calc.fn(
-    select.cgcs.state.data.function(
-    yearx = year.a,
-    districtx = district.a,
-    statex = state.a))
-  
+    CGCS.mean.median.calculations(
+      yearx = year.a,
+      leaidx = select.leaid,
+      statex = state.a))
+
   chart.data <- chart.data %>%
     mutate(
       legend_group = case_when(
         `chart marker` == "District" ~ select.district,
-        `chart marker` == "Mean" ~ "Mean",
+        `chart marker` == "CGCS Mean" ~ "CGCS Mean",
         `chart marker` == "Median" ~ "Median",
         `chart marker` == "State" ~ select.state,
         TRUE ~ "Other Districts"
@@ -1275,11 +1490,11 @@ CGCS.chart.large.to.small.fn <- function(data.group,titlex,year.a,district.a,sta
   Q3 <- quantile(chart.data[[data.group]], 0.75, na.rm = TRUE)
   iqr <- IQR(chart.data[[data.group]], na.rm = TRUE)
   
-  #The outlier check does not affect the district, state, mean or median
+  #The outlier check does not affect the district, state, CGCS Mean or median
   chart.data.plot <- chart.data %>%
     filter(legend_group %in% c(select.district,
                                select.state,
-                               "Mean",
+                               "CGCS Mean",
                                "Median") |
              #Range set to 1.5, increase if there are legitimate districts being removed
              between(.data[[data.group]],
@@ -1300,70 +1515,109 @@ CGCS.chart.large.to.small.fn <- function(data.group,titlex,year.a,district.a,sta
     # Plot all other districts first
     geom_point(
       data = filter(
-        chart.data.plot,!legend_group %in% c(select.district, select.state, "Mean", "Median")
-      ),
+        chart.data.plot,!legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")),
       size = 2.8,
-      alpha = 0.45
-    ) +
+      alpha = 0.45) +
     # Plot highlighted groups last
     geom_point(
       data = filter(
         chart.data.plot,
-        legend_group %in% c(select.district, select.state, "Mean", "Median")
-      ),
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")),
       size = 5,
-      stroke = 1.2
-    ) +
+      stroke = 1.2) +
     scale_color_manual(values = color.set) +
     scale_x_continuous(breaks = seq(0, max(chart.data.plot$rank), by = 50)) +
     scale_y_continuous() +
     labs(x = "District Ranking",
          y = "Ratio", 
-         title = stringr::str_wrap(titlex, width = 50),
-         subtitle = "All CGCS Districts",
+         title = titlex,
+         subtitle = paste0("CGCS Member Districts"),
          caption = caption_text,
          color = NULL) +
     cgcs_theme() +
-    cgcs_legend
+    cgcs_legend+
+    #Plot that overlays the data points for CGCS Mean Median, Select district and State. 
+    geom_text_repel(
+      data = filter(
+        chart.data.plot,
+        legend_group %in% c(select.district, select.state, "CGCS Mean", "Median")
+      ),
+      aes(label = round(.data[[data.group]], 1)),
+      color = "Black",
+      direction = "y",
+      vjust = -3,
+      point.padding = 2.5,
+      box.padding = 0.4,
+      segment.color = "grey60",
+      segment.size = 0.4,
+      size = 4,
+      fontface = "bold",
+      max.overlaps = Inf,
+      show.legend = FALSE
+    )
 }
 
 #Chart 1 Student to Total District Staff Ratio in DISTRICTX and Great City School Districts
-fig.19 <- CGCS.chart.large.to.small.fn(  "PUPADM",
-                                   paste0("Student to Total District Staff Ratio in ",select.district," and Great City School Districts"),
-                                   set.year,
-                                   select.district,
-                                   select.state,
-                                   "number of students-to-total staff")
+fig.19 <- CGCS.chart.large.to.small.fn(
+  data.group = "PUPADM",
+  titlex =  paste0("Student to Total District Staff Ratio in\n ",select.district,"\n and Great City School Districts"),
+  year.a =  set.year,
+  district.a =  select.district,
+  leaid.a =  select.leaid,
+  state.a =  select.state,
+  measure.a = "number of students-to-total staff")
+
+fig.19
+
 #Chart 2 Teachers as a Percentage of Total Staff in DISTRICTX and Great City School Districts
-fig.20 <- CGCS.Percent.of.Staff.that.are.Teachers.fn("PCTTCH", 
-                                               set.year, 
-                                               select.district, 
-                                               select.state)
+fig.20 <- CGCS.Percent.of.Staff.that.are.Teachers.fn("PCTTCH", set.year, select.district, select.state)
+
+fig.20
 #Chart 3 Students per Teacher in DISTRICTX and Great City School Districts
-fig.21 <- CGCS.Pupil.to.Teacher.Ratio.fn("PUPTCH", 
-                                   set.year, 
-                                   select.district, 
-                                   select.state)
+fig.21 <- CGCS.Pupil.to.Teacher.Ratio.fn("PUPTCH", set.year, select.district, select.state)
+fig.21
 #Chart 4 Students per Total Central Office Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.22 <- CGCS.chart.large.to.small.fn("PUPLEA",
-                                 paste0("Students per Total Central Office Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 select.district,
-                                 select.state,
-                                 "number of students per central office administrative and support staff.")
+fig.22 <- CGCS.chart.large.to.small.fn(
+  "PUPLEA",
+  paste0(
+    "Students per Total Central Office Administrative and Support Staff in\n ",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per central office administrative and support staff."
+)
 #Chart 5 Students per Total School Site Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.23 <- CGCS.chart.large.to.small.fn("PUPSCH",
-                                 paste0("Students per Total School Site Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 select.district,
-                                 select.state,
-                                 "number of students per administrator")
+fig.23 <- CGCS.chart.large.to.small.fn(
+  "PUPSCH",
+  paste0(
+    "Students per Total School Site Administrative and Support Staff in \n",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per administrator"
+)
 #Chart 6 Students per Combined School and Central Office Administrative and Support Staff in DISTRICTX and Great City School Districts
-fig.24 <- CGCS.chart.large.to.small.fn("PUPSTF",
-                                 paste0("Students per Combined School and Central Office Administrative and Support Staff in ",select.district," and Great City School Districts"),
-                                 set.year,
-                                 select.district,
-                                 select.state,
-                                 "number of students per combined school-based and central office administrators and support staff")
+fig.24 <- CGCS.chart.large.to.small.fn(
+  "PUPSTF",
+  paste0(
+    "Students per Combined School and Central Office Administrative and Support Staff in \n",
+    select.district,
+    "\n and Great City School Districts"
+  ),
+  set.year,
+  select.district,
+  select.leaid,
+  select.state,
+  "number of students per combined school-based and central office administrators and support staff"
+)
+
 #Appendix creation
 appendix_cgcs_table <- CGCS.appendix.table.fn(set.year)
