@@ -3,10 +3,15 @@ output:
   pdf_document:
     latex_engine: xelatex
 mainfont: Calibri
+urlcolor: blue
+linkcolor: black
+geometry: margin=0.6in
 params:
   district_name: NULL
   state_name: NULL
   district_leaid: NULL
+  select_year: NULL
+  full_year_name: NULL
 header-includes:
   - \usepackage{graphicx}
   - \usepackage{titlesec}
@@ -18,92 +23,88 @@ header-includes:
   - \definecolor{navy}{RGB}{0, 84, 159}
   - \usepackage[normalem]{ulem}
   - \titleformat{\section}{\centering\LARGE\bfseries}{\thesection}{1em}{}
-  
+  - \newenvironment{narrative}{\par\vspace{0.25cm}\fontsize{13}{16}\selectfont}{\par}
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  error = TRUE,
+  error = FALSE,
   echo = FALSE,
-  warning = TRUE,
-  message = TRUE,
+  warning = FALSE,
+  message = FALSE,
   fig.width = 10.5,
-fig.height = 7.5,
-dpi = 300
+  fig.height = 7.5,
+  dpi = 300
 )
 
-district_name <- "Jackson Public Schools"
-district_leaid <- 2802190
-state_name <- "MISSISSIPPI"
-
-#district_name <- params$district_name
-#district_leaid <- params$district_leaid
-#state_name <- params$state_name
+district_name <- params$district_name
+district_leaid <- params$district_leaid
+state_name <- params$state_name
+set.year <- params$select_year
+full.year <- params$full_year_name
 
 source(
   "Staffing Report Generator.R",
   local = TRUE
 )
-
-cat("Loaded Staffing Report Generator\n")
-
 ```
 
 ```{r narrative_text, include=FALSE}
-build_narratives <- function(sizex) {
+# Escape special LaTeX characters (%, \$, &) so percentages don't comment out text
+escape_tex <- function(x) {
+  if (is.null(x) || length(x) == 0) return("")
+  x <- as.character(x)
+  x <- gsub("%", "\\%", x, fixed = TRUE)
+  x <- gsub("&", "\\&", x, fixed = TRUE)
+  x <- gsub("$", "\\$", x, fixed = TRUE)
+  return(x)
+}
 
+
+build_narratives <- function(sizex) {
   comparison_data <- chart.data.calc.fn(
-    select.district.data.function(
+    mean.median.calculations(
       yearx = set.year,
       leaidx = select.leaid,
       districtx = select.district,
       statex = select.state,
-      sizex = sizex))
+      sizex = sizex
+    )
+  )
 
   list(
-    chart1 = chart_1_narrative_fn(
-      comparison_data,
-      select.district),
-    chart2 = chart_2_narrative_fn(
-      comparison_data,
-      select.district),
-    chart3 = chart_3_narrative_fn(
-      comparison_data,
-      select.district),
-    chart4 = chart_4_narrative_fn(
-      comparison_data,
-      select.district),
-    chart5 = chart_5_narrative_fn(
-      comparison_data,
-      select.district),
-    chart6 = chart_6_narrative_fn(
-      comparison_data,
-      select.district)
+    chart1 = escape_tex(chart_1_narrative_fn(comparison_data, select.district)),
+    chart2 = escape_tex(chart_2_narrative_fn(comparison_data, select.district)),
+    chart3 = escape_tex(chart_3_narrative_fn(comparison_data, select.district)),
+    chart4 = escape_tex(chart_4_narrative_fn(comparison_data, select.district)),
+    chart5 = escape_tex(chart_5_narrative_fn(comparison_data, select.district)),
+    chart6 = escape_tex(chart_6_narrative_fn(comparison_data, select.district))
   )
 }
 
 narrative_15k  <- build_narratives(15000)
 narrative_50k  <- build_narratives(50000)
 narrative_100k <- build_narratives(100000)
-
 ```
 
 ```{r CGCS_narrative_text, include=FALSE}
 build_cgcs_narratives <- function() {
-
   comparison_data <- chart.data.calc.fn(
-  select.cgcs.state.data.function(
-    yearx = set.year,
-    leaidx = select.leaid,
-    statex = select.state))
+    CGCS.mean.median.calculations(
+      yearx = set.year,
+      leaidx = select.leaid,
+      districtx = select.district,
+      statex = select.state
+    )
+  )
 
   list(
-    chart1 = chart_1_narrative_fn(comparison_data, select.district),
-    chart2 = chart_2_narrative_fn(comparison_data, select.district),
-    chart3 = chart_3_narrative_fn(comparison_data, select.district),
-    chart4 = chart_4_narrative_fn(comparison_data, select.district),
-    chart5 = chart_5_narrative_fn(comparison_data, select.district),
-    chart6 = chart_6_narrative_fn(comparison_data, select.district)
+    chart1 = escape_tex(chart_1_narrative_fn(comparison_data, select.district)),
+    chart2 = escape_tex(chart_2_narrative_fn(comparison_data, select.district)),
+    chart3 = escape_tex(chart_3_narrative_fn(comparison_data, select.district)),
+    chart4 = escape_tex(chart_4_narrative_fn(comparison_data, select.district)),
+    chart5 = escape_tex(chart_5_narrative_fn(comparison_data, select.district)),
+    chart6 = escape_tex(chart_6_narrative_fn(comparison_data, select.district))
   )
 }
 
@@ -115,11 +116,13 @@ narrative_cgcs <- build_cgcs_narratives()
 
 \begin{center}
 
-\includegraphics[width=6cm]{CGCS_logo.png}
+```{r cover-logo, out.width="6cm"}
+knitr::include_graphics("C:/Users/bgarcia/OneDrive - Council of the Great City Schools/General/Research Requests/Staffing/Staffing-Report-R-Code/CGCS_logo.png")
+```
 
 \vspace{0.5cm}
 
-{\Huge \textbf{Staffing Report}}
+{\Huge \textbf{`r params$full_year_name` Staffing Report}}
 
 \vspace{0.5cm}
 
@@ -180,25 +183,40 @@ narrative_cgcs <- build_cgcs_narratives()
 
 # Introduction
 
-This report summarizes staffing information for **`r params$district_name`** in **`r params$state_name`**.
+\large
+This staffing report is prepared annually by the Council of the Great City Schools using the most recent data available from the \href{https://nces.ed.gov/ccd/files.asp}{National Center for Education Statistics (NCES)} Common Core of Data (CCD) for Public Elementary and Secondary Education. This staffing report summarizes staffing levels and workforce indicators for **`r params$district_name`** in **`r params$state_name`** during the **`r params$full_year_name`** school year, with comparisons to districts of similar enrollment size.
+
+These comparisons help districts benchmark their staffing patterns against other school systems, assess workforce allocation relative to student enrollment, and inform district staffing policies and operational decisions. 
+
+Each staffing report includes six key staffing indicators:
+
+  -	Student-to-Total Staff Ratio
+  -	Teachers as a Percentage of Total Staff
+  -	Student-to-Teacher Ratio
+  -	Students per Central Office Administrative and Support Staff Member
+  -	Students per School-Site Administrative and Support Staff Member
+  -	Students per Combined Administrative and Support Staff Member (School-Site and Central Office)
+
+\normalsize
 
 \newpage 
 
 \vspace*{\fill} 
 
+\phantomsection
 \addcontentsline{toc}{section}{Workforce Composition of School Districts with 15,000 or More Students} 
 
 \begin{center} 
 {\Huge\bfseries 
-\uline{Workforce Composition of School Districts with}\\[0.4cm] 
-\uline{\textcolor{navy}{15,000 or More Students}} 
+Workforce Composition of School Districts with\\[0.4cm] 
+\textcolor{navy}{15,000 or More Students} 
 } 
 \end{center} 
 
 \vspace*{\fill} 
 
 \newpage
-
+\phantomsection
 \addcontentsline{toc}{subsection}{Figure 1: Student to Total District Staff Ratio}
 **Figure 1.**
 
@@ -206,10 +224,12 @@ This report summarizes staffing information for **`r params$district_name`** in 
 print(fig.1)
 ```
 
+\begin{narrative}
 `r narrative_15k$chart1`
+\end{narrative}
 
 \newpage
-
+\phantomsection
 \addcontentsline{toc}{subsection}{Figure 2: Teachers as a Percentage of Total Staff}
 **Figure 2.**
 
@@ -218,10 +238,11 @@ print(fig.1)
 print(fig.2)
 ```
 
+\begin{narrative}
 `r narrative_15k$chart2`
-
+\end{narrative}
 \newpage
-
+\phantomsection
 \addcontentsline{toc}{subsection}{Figure 3: Students per Teacher Ratio}
 **Figure 3.**
 
@@ -230,10 +251,12 @@ print(fig.2)
 print(fig.3)
 ```
 
+\begin{narrative}
 `r narrative_15k$chart3`
+\end{narrative}
 
 \newpage
-
+\phantomsection
 \addcontentsline{toc}{subsection}{Figure 4: Students per Total Central Office Administrative and Support Staff}
 **Figure 4.**
 
@@ -241,29 +264,33 @@ print(fig.3)
 print(fig.4)
 ```
 
+\begin{narrative}
 `r narrative_15k$chart4`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 5: Students per Total School Site Administrative and Support Staff}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 5: Students per Total School Site Administrative and Support Staff}
 **Figure 5.**
 
 ```{r fig5}
 print(fig.5)
 ```
 
+\begin{narrative}
 `r narrative_15k$chart5`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 6: Students per Combined School and Central Office Administrative and Support Staff }
+\phantomsection \addcontentsline{toc}{subsection}{Figure 6: Students per Combined School and Central Office Administrative and Support Staff }
 **Figure 6.**
 
 ```{r fig6}
 print(fig.6)
 ```
 
+\begin{narrative}
 `r narrative_15k$chart6`
+\end{narrative}
 
 \newpage 
 \thispagestyle{empty} 
@@ -272,12 +299,12 @@ print(fig.6)
 
 \vspace*{\fill} 
 
-\addcontentsline{toc}{section}{Workforce Composition of School Districts with 50,000 or More Students} 
+\phantomsection \addcontentsline{toc}{section}{Workforce Composition of School Districts with 50,000 or More Students} 
 
 \begin{center} 
 {\Huge\bfseries 
-\uline{Workforce Composition of School Districts with}\\[0.4cm] 
-\uline{\textcolor{navy}{50,000 or More Students}} 
+Workforce Composition of School Districts with\\[0.4cm] 
+\textcolor{navy}{50,000 or More Students} 
 } 
 \end{center}  
 
@@ -285,18 +312,20 @@ print(fig.6)
 
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 7: Student to Total District Staff Ratio}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 7: Student to Total District Staff Ratio}
 **Figure 7.**
 
 ```{r fig7}
 print(fig.7)
 ```
 
+\begin{narrative}
 `r narrative_50k$chart1`
+\end{narrative}
 
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 8: Teachers as a Percentage of Total Staff}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 8: Teachers as a Percentage of Total Staff}
 **Figure 8.**
 
 ```{r fig8}
@@ -304,11 +333,12 @@ print(fig.7)
 print(fig.8)
 ```
 
+\begin{narrative}
 `r narrative_50k$chart2`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 9: Students per Teacher Ratio}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 9: Students per Teacher Ratio}
 **Figure 9.**
 
 ```{r fig9}
@@ -316,51 +346,55 @@ print(fig.8)
 print(fig.9)
 ```
 
+\begin{narrative}
 `r narrative_50k$chart3`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 10: Students per Total Central Office Administrative and Support Staff}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 10: Students per Total Central Office Administrative and Support Staff}
 **Figure 10.**
 
 ```{r fig10}
 print(fig.10)
 ```
 
+\begin{narrative}
 `r narrative_50k$chart4`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 11: Students per Total School Site Administrative and Support Staff}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 11: Students per Total School Site Administrative and Support Staff}
 **Figure 11.**
 
 ```{r fig11}
 print(fig.11)
 ```
 
+\begin{narrative}
 `r narrative_50k$chart5`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 12: Students per Combined School and Central Office Administrative and Support Staff }
+\phantomsection \addcontentsline{toc}{subsection}{Figure 12: Students per Combined School and Central Office Administrative and Support Staff }
 **Figure 12.**
 
 ```{r fig12}
 print(fig.12)
 ```
 
+\begin{narrative}
 `r narrative_50k$chart6`
-
+\end{narrative}
 \newpage 
 
 \vspace*{\fill} 
 
-\addcontentsline{toc}{section}{Workforce Composition of School Districts with 100,000 or More Students} 
+\phantomsection \addcontentsline{toc}{section}{Workforce Composition of School Districts with 100,000 or More Students} 
 
 \begin{center} 
 {\Huge\bfseries 
-\uline{Workforce Composition of School Districts with}\\[0.4cm] 
-\uline{\textcolor{navy}{100,000 or More Students}} 
+Workforce Composition of School Districts with\\[0.4cm] 
+\textcolor{navy}{100,000 or More Students} 
 } 
 \end{center} 
 
@@ -369,18 +403,20 @@ print(fig.12)
 \newpage
 
 
-\addcontentsline{toc}{subsection}{Figure 13: Student to Total District Staff Ratio}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 13: Student to Total District Staff Ratio}
 **Figure 13.**
 
 ```{r fig13}
 print(fig.13)
 ```
 
+\begin{narrative}
 `r narrative_100k$chart1`
+\end{narrative}
 
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 14: Teachers as a Percentage of Total Staff}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 14: Teachers as a Percentage of Total Staff}
 **Figure 14.**
 
 ```{r fig14}
@@ -388,11 +424,12 @@ print(fig.13)
 print(fig.14)
 ```
 
+\begin{narrative}
 `r narrative_100k$chart2`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 15: Students per Teacher Ratio}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 15: Students per Teacher Ratio}
 **Figure 15.**
 
 ```{r fig15}
@@ -400,51 +437,56 @@ print(fig.14)
 print(fig.15)
 ```
 
+\begin{narrative}
 `r narrative_100k$chart3`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 16: Students per Total Central Office Administrative and Support Staff}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 16: Students per Total Central Office Administrative and Support Staff}
 **Figure 16.**
 
 ```{r fig16}
 print(fig.16)
 ```
 
+\begin{narrative}
 `r narrative_100k$chart4`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 17: Students per Total School Site Administrative and Support Staff}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 17: Students per Total School Site Administrative and Support Staff}
 **Figure 17.**
 
 ```{r fig17}
 print(fig.17)
 ```
 
+\begin{narrative}
 `r narrative_100k$chart5`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 18: Students per Combined School and Central Office Administrative and Support Staff }
+\phantomsection \addcontentsline{toc}{subsection}{Figure 18: Students per Combined School and Central Office Administrative and Support Staff }
 **Figure 18.**
 
 ```{r fig18}
 print(fig.18)
 ```
 
+\begin{narrative}
 `r narrative_100k$chart6`
+\end{narrative}
 
 \newpage 
 
 \vspace*{\fill} 
 
-\addcontentsline{toc}{section}{Workforce Composition of Member Districts of the Council of the Great City Schools} 
+\phantomsection \addcontentsline{toc}{section}{Workforce Composition of Member Districts of the Council of the Great City Schools} 
 
 \begin{center} 
 {\Huge\bfseries 
-\uline{Workforce Composition of School Districts in}\\[0.4cm] 
-\uline{\textcolor{navy}{The Council of the Great City Schoools}} 
+Workforce Composition of School Districts in\\[0.4cm] 
+\textcolor{navy}{The Council of the Great City Schoools} 
 } 
 \end{center}  
 
@@ -452,18 +494,20 @@ print(fig.18)
 
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 19: Student to Total District Staff Ratio}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 19: Student to Total District Staff Ratio}
 **Figure 19.**
 
 ```{r fig19}
 print(fig.19)
 ```
 
+\begin{narrative}
 `r narrative_cgcs$chart1`
+\end{narrative}
 
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 20: Teachers as a Percentage of Total Staff}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 20: Teachers as a Percentage of Total Staff}
 **Figure 20.**
 
 ```{r fig20}
@@ -471,11 +515,12 @@ print(fig.19)
 print(fig.20)
 ```
 
+\begin{narrative}
 `r narrative_cgcs$chart2`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 21: Students per Teacher Ratio}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 21: Students per Teacher Ratio}
 **Figure 21.**
 
 ```{r fig21}
@@ -483,41 +528,45 @@ print(fig.20)
 print(fig.21)
 ```
 
+\begin{narrative}
 `r narrative_cgcs$chart3`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 22: Students per Total Central Office Administrative and Support Staff}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 22: Students per Total Central Office Administrative and Support Staff}
 **Figure 22.**
 
 ```{r fig22}
 print(fig.22)
 ```
 
+\begin{narrative}
 `r narrative_cgcs$chart4`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 23: Students per Total School Site Administrative and Support Staff}
+\phantomsection \addcontentsline{toc}{subsection}{Figure 23: Students per Total School Site Administrative and Support Staff}
 **Figure 23.**
 
 ```{r fig23}
 print(fig.23)
 ```
 
+\begin{narrative}
 `r narrative_cgcs$chart5`
-
+\end{narrative}
 \newpage
 
-\addcontentsline{toc}{subsection}{Figure 24: Students per Combined School and Central Office Administrative and Support Staff }
+\phantomsection \addcontentsline{toc}{subsection}{Figure 24: Students per Combined School and Central Office Administrative and Support Staff }
 **Figure 24.**
 
 ```{r fig24}
 print(fig.24)
 ```
 
+\begin{narrative}
 `r narrative_cgcs$chart6`
-
+\end{narrative}
 \newpage
 
 # Appendix
